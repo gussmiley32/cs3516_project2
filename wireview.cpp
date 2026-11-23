@@ -156,6 +156,10 @@ void packet_callback(u_char *user, const struct pcap_pkthdr *pkthdr, const u_cha
             stats->udp_dst_ports[dport]++;
         }
     } else if (ntohs(ether_type) == ETHERTYPE_ARP) {
+        if (pkthdr->caplen < 42) {
+            return;
+        }
+
         // ARP header, then the address fields that follow it
         const auto *arp_hdr = reinterpret_cast<const struct arphdr *>(packet + sizeof(struct ether_header));
         const auto *arp_payload = reinterpret_cast<const uint8_t *>(arp_hdr) + sizeof(struct arphdr);
@@ -251,6 +255,8 @@ int main(int argc, char *argv[]) {
         pcap_close(handle);
         return 1;
     }
+
+    pcap_close(handle);
 
     print_report(stats);
 
