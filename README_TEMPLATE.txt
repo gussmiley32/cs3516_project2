@@ -91,9 +91,48 @@ Did not call ntohs() on ether_type (defect)
 Misaligned memory access
 - Line number(s): 91
 - Trigger: edge-ipopts.pcap, caught with the sanitizer
-- Observation (program output or sanitizer report vs. Wireshark, with filter):
-- Root cause (header path + struct/field, or man page):
+- Observation: memory misalignment error with the ipv4 on the sanitizer report
+- Root cause: address ended in 0x8e (14), which isn't divisible by 4, so there's a misalignment error
 - Fix applied, and output after the fix:
+// Verify that the Ethernet and minimum IPv4 headers exist.
+if (pkthdr->caplen < sizeof(struct ether_header) + sizeof(struct ip)) {
+   return;
+}
+
+// Copy IPv4 header into aligned local storage.
+struct ip ip_hdr_storage;
+
+std::memcpy(
+   &ip_hdr_storage,
+   packet + sizeof(struct ether_header),
+   sizeof(struct ip)
+);
+
+const struct ip *ip_hdr = &ip_hdr_storage;
+
+to replace the ip_hdr declaration that was already there. now the sanitizer report doesnt show the misalignment error
+
+reading beyond captured packet buffer
+- Line number(s): N/A (added code to fix it at line 159-161)
+- Trigger: edge-snap34.pcap, all frames
+- Observation: lots of errors on the sanitixer report
+- Root cause: in the ARP section, the code did not check to make sure there was at least 42 bytes, the minimum # to read all of the ARP info
+- Fix applied, and output after the fix:
+if (pkthdr->caplen < 42) {
+   return;
+}
+
+added to lines 159-161, and sanitixer report no longer gives errors
+
+handle not being closed after the pcap_loop
+- Line number(s): N/A (fix on line 259)
+- Trigger: all of the edge pcaps
+- Observation: all of the edge pcaps gave memory leak errors on their sanitizer report
+- Root cause: pcap handle was only closed if a specific criteria was met
+- Fix applied, and output after the fix:
+pcap_close(handle);
+
+added to line 259, sanitizer report no longer gives memory leak errors
 
 --------------------------------------------------------------------------------
 PART 3: WIRESHARK RECONCILIATION
@@ -144,6 +183,9 @@ is truncated or malformed, and which checks happen in which order.
 --------------------------------------------------------------------------------
 AI USE DISCLOSURE
 --------------------------------------------------------------------------------
-Tools used (or "none"):
-What you used them for:
-One case where a tool was wrong, or where you overruled it, and how you knew:
+Tools used (or "none"): ChatGPT
+What you used them for: Explaining what different errors from the sanitizer
+reports meant, and writing code to fix those errors.
+One case where a tool was wrong, or where you overruled it, and how you knew: It
+wanted to change the way we constructed our eth headers, but I knew this was
+unnecessary because we were not getting any errors with the eth headers.
