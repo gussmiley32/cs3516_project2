@@ -103,15 +103,15 @@ that produced it, so the grader can repeat it.
 
 Metric                                   | Starter | Wireshark | Patched
 -----------------------------------------+---------+-----------+--------
-Total packets (project2-dns)             |         |           |
-Duration, seconds (project2-dns)         |         |           |
-Distinct IPv4 senders (project2-dns)     |         |           |
-Distinct UDP dst ports (project2-dns)    |         |           |
-ARP participants (project2-arp-storm)    |         |           |
-ARP participants (project2-other-network)|         |           |
-Packets to UDP port 53 (edge-ipopts)     |         |           |
-ARP participants (edge-arp)              |         |           |
-Distinct UDP dst ports (edge-mixed)      |         |           |
+Total packets (project2-dns)             |    4    |     4     |    4
+Duration, seconds (project2-dns)         | .076439 |  .076439  | .076439 
+Distinct IPv4 senders (project2-dns)     |    0    |     2     |    2
+Distinct UDP dst ports (project2-dns)    |    0    |     4     |   
+ARP participants (project2-arp-storm)    |    0    |   312, 9  |
+ARP participants (project2-other-network)|    0    |  147, 53  |
+Packets to UDP port 53 (edge-ipopts)     |    0    |     0     |
+ARP participants (edge-arp)              |    0    |    6, 5   |
+Distinct UDP dst ports (edge-mixed)      |    0    |     2     |
 Skipped packets (edge-snap34)            |   n/a   |    *      |
 Skipped packets (edge-shortframes)       |   n/a   |    *      |
 
