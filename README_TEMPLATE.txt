@@ -145,20 +145,31 @@ Metric                                   | Starter | Wireshark | Patched
 Total packets (project2-dns)             |    4    |     4     |    4
 Duration, seconds (project2-dns)         | .076439 |  .076439  | .076439 
 Distinct IPv4 senders (project2-dns)     |    0    |     2     |    2
-Distinct UDP dst ports (project2-dns)    |    0    |     4     |   
-ARP participants (project2-arp-storm)    |    0    |   312, 9  |
-ARP participants (project2-other-network)|    0    |  147, 53  |
-Packets to UDP port 53 (edge-ipopts)     |    0    |     0     |
-ARP participants (edge-arp)              |    0    |    6, 5   |
-Distinct UDP dst ports (edge-mixed)      |    0    |     2     |
-Skipped packets (edge-snap34)            |   n/a   |    *      |
-Skipped packets (edge-shortframes)       |   n/a   |    *      |
+Distinct UDP dst ports (project2-dns)    |    0    |     2     |    2
+ARP participants (project2-arp-storm)    |    0    |    312    |    x
+ARP participants (project2-other-network)|    0    |    147    |    x
+Packets to UDP port 53 (edge-ipopts)     |    0    |    10     |    x
+ARP participants (edge-arp)              |    0    |     6     |    x
+Distinct UDP dst ports (edge-mixed)      |    0    |     4     |    x
+Skipped packets (edge-snap34)            |   n/a   |     8     |    x
+Skipped packets (edge-shortframes)       |   n/a   |     5     |    5
 
 * Wireshark has no single "skipped" statistic. List the frame numbers you
   expect to be skipped and the reason for each (Capture Length vs. the headers
   that frame needs).
 
 How each Wireshark value was obtained:
+Total packets (project2-dns): tshark -r captures/project2-dns.pcap | wc -l
+Duration, seconds (project2-dns): tshark -r captures/project2-dns.pcap -T fields -e frame.time_epoch | awk 'NR==1{first=$1} {last=$1} END{print last-first " seconds"}'
+Distinct IPv4 senders (project2-dns): tshark -r captures/project2-dns.pcap -Y "ip" -T fields -e ip.src | sort -u
+Distinct UDP dst ports (project2-dns): tshark -r captures/project2-dns.pcap -Y "udp" -T fields -e udp.dstport | sort -un
+ARP participants (project2-arp-storm): tshark -r captures/project2-arp-storm.pcap -Y "arp" -T fields \-e arp.src.proto_ipv4 -e arp.dst.proto_ipv4 |tr '\t' '\n' | grep -v '^$' | sort -u | wc -l
+ARP participants (project2-other-network): tshark -r captures/project2-other-network.pcap -Y "arp" -T fields \-e arp.src.proto_ipv4 -e arp.dst.proto_ipv4 |tr '\t' '\n' | grep -v '^$' | sort -u | wc -l
+Packets to UDP port 53 (edge-ipopts): tshark -r captures/edge-ipopts.pcap -Y "udp.dstport == 53" | wc -l
+ARP participants (edge-arp): tshark -r captures/edge-arp.pcap -Y "arp" -T fields \-e arp.src.proto_ipv4 -e arp.dst.proto_ipv4 |tr '\t' '\n' | grep -v '^$' | sort -u | wc -l
+Distinct UDP dst ports (edge-mixed): tshark -r captures/edge-mixed.pcap -Y "udp" -T fields -e udp.dstport | sort -un
+Skipped packets (edge-snap34): All, packets were cut off during capture
+Skipped packets (edge-shortframes): 2, 3, 5, 8, 10, packets were cut off during capture
 
 --------------------------------------------------------------------------------
 PART 4: BYTES TO FIELDS
@@ -180,12 +191,20 @@ PART 5: EXTENSION
 Describe in 3-5 sentences how your skipped-packet counter decides that a packet
 is truncated or malformed, and which checks happen in which order.
 
+Our program checks to make sure a minimum number of bits are present in the
+packet to detect abberations. First, our it checks if the caplen is < the len,
+which indicates a TCP truncated frame. Then, its behavior changes whether the
+packet is IPv4 or ARP. For IPv4 packets, it checks that the minimum Ethernet and
+IPv4 headers exist, the IP value is 4, the header length is at least 20 bits,
+the complete IP header exists, and that the UDP header is in the correct spot.
+
 --------------------------------------------------------------------------------
 AI USE DISCLOSURE
 --------------------------------------------------------------------------------
 Tools used (or "none"): ChatGPT
 What you used them for: Explaining what different errors from the sanitizer
-reports meant, and writing code to fix those errors.
+reports meant, writing code to fix those errors, giving different Wireshark
+commands for the reconciliation.
 One case where a tool was wrong, or where you overruled it, and how you knew: It
 wanted to change the way we constructed our eth headers, but I knew this was
 unnecessary because we were not getting any errors with the eth headers.

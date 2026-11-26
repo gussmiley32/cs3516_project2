@@ -30,6 +30,7 @@ struct CaptureStats {
     struct timeval start_time{};
     struct timeval end_time{};
     uint64_t total_packets = 0;
+    uint64_t skipped_packets = 0;
 
     uint64_t total_bytes = 0;
     uint32_t min_pkt_size = UINT32_MAX;
@@ -87,10 +88,16 @@ void packet_callback(u_char *user, const struct pcap_pkthdr *pkthdr, const u_cha
 
     uint16_t ether_type = eth_hdr->ether_type;
 
+    if(pkthdr->caplen < pkthdr->len){
+        stats->skipped_packets++;
+        return;
+    }
+
     if (ntohs(ether_type) == ETHERTYPE_IP) {
 
         // Verify that the Ethernet and minimum IPv4 headers exist.
         if (pkthdr->caplen < sizeof(struct ether_header) + sizeof(struct ip)) {
+            stats->skipped_packets++;
             return;
         }
 
@@ -106,6 +113,7 @@ void packet_callback(u_char *user, const struct pcap_pkthdr *pkthdr, const u_cha
         const struct ip *ip_hdr = &ip_hdr_storage;
 
         if (ip_hdr->ip_v != 4) {
+            stats->skipped_packets++;
             return;
         }
 
@@ -113,6 +121,7 @@ void packet_callback(u_char *user, const struct pcap_pkthdr *pkthdr, const u_cha
         size_t ip_header_len = ip_hdr->ip_hl * 4;
 
         if (ip_header_len < sizeof(struct ip)) {
+            stats->skipped_packets++;
             return;
         }
 
@@ -120,6 +129,7 @@ void packet_callback(u_char *user, const struct pcap_pkthdr *pkthdr, const u_cha
 
         // Validate complete IPv4 header.
         if (pkthdr->caplen < ip_offset + ip_header_len) {
+            stats->skipped_packets++;
             return;
         }
 
@@ -138,6 +148,7 @@ void packet_callback(u_char *user, const struct pcap_pkthdr *pkthdr, const u_cha
             size_t udp_offset = ip_offset + ip_header_len;
 
             if (pkthdr->caplen < udp_offset + sizeof(struct udphdr)) {
+                stats->skipped_packets++;
                 return;
             }
 
@@ -157,6 +168,7 @@ void packet_callback(u_char *user, const struct pcap_pkthdr *pkthdr, const u_cha
         }
     } else if (ntohs(ether_type) == ETHERTYPE_ARP) {
         if (pkthdr->caplen < 42) {
+            stats->skipped_packets++;
             return;
         }
 
@@ -198,6 +210,10 @@ void print_report(const CaptureStats &stats) {
         std::cout << "Packet Sizes:  min=" << stats.min_pkt_size
                   << " B, max=" << stats.max_pkt_size
                   << " B, avg=" << std::fixed << std::setprecision(2) << avg_size << " B\n";
+    }
+
+    if (stats.skipped_packets > 0) {
+        std::cout << "Skipped Packets (truncated or malformed): " << stats.skipped_packets << "\n";
     }
 
     std::cout << "\n--- Ethernet Senders ---\n";
@@ -255,6 +271,9 @@ int main(int argc, char *argv[]) {
         pcap_close(handle);
         return 1;
     }
+
+    std::cout << "ARP: " << ETHERTYPE_ARP << "\n";
+    std::cout << "IP: " << ETHERTYPE_IP << "\n";
 
     pcap_close(handle);
 
